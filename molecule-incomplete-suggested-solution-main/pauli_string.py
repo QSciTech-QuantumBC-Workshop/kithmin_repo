@@ -123,10 +123,8 @@ class PauliString:
         ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        n = len(zx_bits)
-        arrays = np.array_split(zx_bits, n/4)
-        z_bits = arrays[0]
-        x_bits = arrays[1] 
+        z_bits = np.array_split(zx_bits, 2)[0]
+        x_bits = np.array_split(zx_bits, 2)[1] 
         ################################################################################################################
         return cls(z_bits, x_bits)
 
@@ -146,17 +144,16 @@ class PauliString:
         ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        z_bits = np.array([0,0,0,0],dtype = bool)
-        x_bits = np.array([0,0,0,0],dtype = bool)
+        z_bits = np.array([0]*len(pauli_str),dtype = bool)
+        x_bits = np.array([0]*len(pauli_str),dtype = bool)
         word = [*pauli_str]
         n = len(word)
         for j in range(n):
-            i = word[j]
-            if i=='Z':
+            if word[j]=='Z':
                 z_bits[n-j-1] = 1
-            if i=='X':
+            if word[j]=='X':
                 x_bits[n-j-1] = 1
-            if i=='Y':
+            if word[j]=='Y':
                 z_bits[n-j-1] = 1
                 x_bits[n-j-1] = 1
                 ################################################################################################################
@@ -216,55 +213,10 @@ class PauliString:
         ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        new_x_bits = np.array([0,0,0,0],dtype = bool)
-        new_z_bits = np.array([0,0,0,0],dtype = bool)
-        w=0
-        x=0
-        word1 = [*str(self)]
-        word2 = [*str(other)]
-        n = len(word1)
-        for j in range(n):
-            i = word1[j]
-            k = word2[j]
-            if i=='I':
-                if k=='X':
-                    new_x_bits[n-j-1] = 1
-                if k=='Y':
-                    new_z_bits[n-j-1] = 1
-                    new_x_bits[n-j-1] = 1
-                if k=='Z':
-                    new_z_bits[n-j-1] = 1
-            if i=='X':
-                if k=='Y':
-                    new_z_bits[n-j-1] = 1
-                    x+=1
-                if k=='Z':
-                    new_z_bits[n-j-1] = 1
-                    new_x_bits[n-j-1] = 1
-                    w+=1
-                if k=='I':
-                    new_x_bits[n-j-1] = 1
-            if i=='Y':
-                if k=='Z':
-                    new_x_bits[n-j-1] = 1
-                    x+=1
-                if k=='X':
-                    new_z_bits[n-j-1] = 1
-                    w+=1
-                if k=='I':
-                    new_x_bits[n-j-1] = 1
-                    new_z_bits[n-j-1] = 1
-            if i=='Z':
-                if k=='X':
-                    new_z_bits[n-j-1] = 1
-                    new_x_bits[n-j-1] = 1
-                    x+=1
-                if k=='Y':
-                    new_x_bits[n-j-1] = 1
-                    w+=1
-                if k=='I':
-                    new_z_bits[n-j-1] = 1
-        phase = ((-1j)**w)*((1j)**x)
+        new_z_bits = np.logical_xor(self.z_bits, other.z_bits)
+        new_x_bits = np.logical_xor(self.x_bits, other.x_bits)
+        w = np.dot(1*other.z_bits, 1*self.x_bits) - np.dot(1*other.x_bits, 1*self.z_bits)
+        phase = (-1j)**(w%4)
         ################################################################################################################
         
         return self.__class__(new_z_bits, new_x_bits), phase
@@ -285,7 +237,7 @@ class PauliString:
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
         pauli_strings = np.array([self],dtype = PauliString)
-        coefs = np.array([coef],dtype = complex)
+        coefs = np.array([coef],dtype = np.complex128)
         ################################################################################################################
 
         return LinearCombinaisonPauliString(coefs, pauli_strings)
@@ -302,15 +254,7 @@ class PauliString:
  ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        ids = np.array([0,0,0,0],dtype = bool)
-        n = len(self)
-        word = [*str(self)]
-        for j in range(n):
-            i = word[j]
-            if i=='I':
-                ids[n-j-1] = 1
-            else:
-                ids[n-j-1] = 0
+        ids = np.invert(self.z_bits + self.x_bits)
                 ################################################################################################################
         return ids
 
@@ -343,11 +287,17 @@ class PauliString:
         # YOUR CODE HERE (OPTIONAL)
         # TO COMPLETE (after lecture on mapping)
         # Hints : start with
-        # matrix = np.ones((1,1),dtype = np.complex128)
+        matrix = np.ones((1,1),dtype = np.complex128)
         # And then use the np.kron() method to build the matrix
-        ################################################################################################################
-
-        raise NotImplementedError()
+        for i in (str(self)):
+            if i == 'I':
+                matrix = np.kron(matrix, I_MAT)
+            elif i == 'X':
+                matrix = np.kron(matrix, X_MAT)
+            elif i == 'Y':
+                matrix = np.kron(matrix, Y_MAT)
+            else:
+                matrix = np.kron(matrix, Z_MAT) ################################################################################################################
         
         return matrix
 
@@ -527,77 +477,18 @@ class LinearCombinaisonPauliString:
         if self.n_qubits != other.n_qubits:
             raise ValueError('Can only add with LCPS of identical number of qubits')
 
-        new_coefs = np.zeros((len(self)*len(other),), dtype=np.complex128)
-        new_pauli_strings = np.zeros((len(self)*len(other),), dtype=PauliString)
+        new_coefs = []
+        new_pauli_strings = []
          ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        new_pauli_strings = []
-        phases = []
-        list1=self.pauli_strings
-        list2=other.pauli_strings
-        c1 = self.coefs
-        c2 = other.coefs
-        for p in range(len(list1)):
-            for q in range(len(list2)):
-                word1 = [*str(list1[p])]
-                word2 = [*str(list2[q])]
-                phase = 0
-
-                new_x_bits = np.array([0,0,0,0],dtype = bool)
-                new_z_bits = np.array([0,0,0,0],dtype = bool)
-                w=0
-                x=0
-                n = len(word1)
-
-                for j in range(n):
-                    i = word1[j]
-                    k = word2[j]
-                    if i=='I':
-                        if k=='X':
-                            new_x_bits[n-j-1] = 1
-                        if k=='Y':
-                            new_z_bits[n-j-1] = 1
-                            new_x_bits[n-j-1] = 1
-                        if k=='Z':
-                            new_z_bits[n-j-1] = 1
-                    if i=='X':
-                        if k=='Y':
-                            new_z_bits[n-j-1] = 1
-                            x+=1
-                        if k=='Z':
-                            new_z_bits[n-j-1] = 1
-                            new_x_bits[n-j-1] = 1
-                            w+=1
-                        if k=='I':
-                            new_x_bits[n-j-1] = 1
-                    if i=='Y':
-                        if k=='Z':
-                            new_x_bits[n-j-1] = 1
-                            x+=1
-                        if k=='X':
-                            new_z_bits[n-j-1] = 1
-                            w+=1
-                        if k=='I':
-                            new_x_bits[n-j-1] = 1
-                            new_z_bits[n-j-1] = 1
-                    if i=='Z':
-                        if k=='X':
-                            new_z_bits[n-j-1] = 1
-                            new_x_bits[n-j-1] = 1
-                            x+=1
-                        if k=='Y':
-                            new_x_bits[n-j-1] = 1
-                            w+=1
-                        if k=='I':
-                            new_z_bits[n-j-1] = 1
-                phase = ((-1j)**w)*((1j)**x)*c1[p]*c2[q]
+        for p in range(len(self.pauli_strings)):
+            for q in range(len(other.pauli_strings)):
+                new_pauli_string, ph = self.pauli_strings[p] * other.pauli_strings[q]
+                phase = ph*self.coefs[p]*other.coefs[q]
                 
-                phases.append(phase)
-                new_pauli_string = PauliString(new_z_bits,new_x_bits)
-                new_pauli_strings.append(new_pauli_string)
-        
-        new_coefs = np.array(phases,dtype = np.complex128)
+                new_pauli_strings = np.append(new_pauli_strings, new_pauli_string)
+                new_coefs = np.append(new_coefs, phase)
         ################################################################################################################
 
         return self.__class__(new_coefs, new_pauli_strings)
@@ -641,25 +532,8 @@ class LinearCombinaisonPauliString:
  ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        count = 0
-        for pauli in self.pauli_strings:
-            word = [*str(pauli)]
-            
-            z_bits = np.array([0,0,0,0],dtype = bool)
-            x_bits = np.array([0,0,0,0],dtype = bool)
-            n = len(word)
-            for j in range(n):
-                i = word[j]
-                if i=='Z':
-                    z_bits[n-j-1] = 1
-                if i=='X':
-                    x_bits[n-j-1] = 1
-                if i=='Y':
-                    z_bits[n-j-1] = 1
-                    x_bits[n-j-1] = 1
-
-            zx_bits[count] = np.concatenate((z_bits,x_bits))
-            count+=1
+        for i in range(len(self)):
+            zx_bits[i] = self.pauli_strings[i].to_zx_bits()
     
 ################################################################################################################
         
@@ -678,25 +552,9 @@ class LinearCombinaisonPauliString:
         ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        count = 0
-        for pauli in self.pauli_strings:
-            word = [*str(pauli)]
-            
-            z_bits = np.array([0,0,0,0],dtype = bool)
-            x_bits = np.array([0,0,0,0],dtype = bool)
-            n = len(word)
-            for j in range(n):
-                i = word[j]
-                if i=='Z':
-                    z_bits[n-j-1] = 1
-                if i=='X':
-                    x_bits[n-j-1] = 1
-                if i=='Y':
-                    z_bits[n-j-1] = 1
-                    x_bits[n-j-1] = 1
-
-            xz_bits[count] = np.concatenate((x_bits,z_bits))
-            count+=1 ################################################################################################################
+        for i in range(len(self)):
+            xz_bits[i] = self.pauli_strings[i].to_xz_bits()
+            ################################################################################################################
 
         return xz_bits
 
@@ -793,10 +651,9 @@ class LinearCombinaisonPauliString:
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
         # Hint : create a np.array<bool> and use this array to get the subset of the lcps where this array is True
-        for pauli in self.pauli_strings:
+        new_coefs = self.coefs[self.coefs > threshold]
+        new_pauli_strings = self.pauli_strings[self.coefs > threshold]
         ################################################################################################################
-
-        raise NotImplementedError()
 
         return self.__class__(new_coefs, new_pauli_strings)
 
@@ -836,10 +693,10 @@ class LinearCombinaisonPauliString:
         ################################################################################################################
         # YOUR CODE HERE
         # TO COMPLETE (after lecture on mapping)
-        # order = 
+        order = self.to_zx_bits() @ 2**np.arange(2*self.n_qubits)
+        order = np.argsort(order)
+        print('The order is:', order)
         ################################################################################################################
-
-        raise NotImplementedError()
 
         new_coefs = self.coefs[order]
         new_pauli_strings = self.pauli_strings[order]
@@ -861,8 +718,7 @@ class LinearCombinaisonPauliString:
         # YOUR CODE HERE (OPTIONAL)
         # TO COMPLETE (after lecture on mapping)
         # Hints : sum all the matrices of all PauliStrings weighted by their coef
-        ################################################################################################################
-
-        raise NotImplementedError()
+        for i in range(self.n_terms):
+            matrix += self.coefs[i] * self.pauli_strings[i].to_matrix() ################################################################################################################
 
         return matrix
